@@ -19,6 +19,13 @@ def get_audio_duration(filepath):
     except:
         return 0
 
+def renumber_tree():
+    """Update the 'No.' column to reflect the current order in the tree."""
+    for idx, item in enumerate(tree.get_children(), start=1):
+        values = list(tree.item(item, "values"))
+        values[0] = str(idx)
+        tree.item(item, values=values)
+
 def add_song_to_list(path):
     if not os.path.isfile(path): return
     try:
@@ -42,7 +49,8 @@ def add_song_to_list(path):
         number_of_songs = 0
         
     tree.insert("", "end", values=(str(number_of_songs+1), title, artist, f"{dur//60:02}:{dur%60:02}"))
-    
+    renumber_tree() 
+
 def add_folder():
     folder = filedialog.askdirectory()
     if not folder: return
@@ -52,6 +60,7 @@ def add_folder():
         if file.lower().endswith(supported_ext):
             path = os.path.join(folder, file)
             add_song_to_list(path)
+    renumber_tree() 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 
     if player:
@@ -75,6 +84,7 @@ def add_songs():
         if file.lower().endswith(supported_ext):
             #path = os.path.join(folder, file)
             add_song_to_list(file)
+    renumber_tree()
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 
 def clear_songs_list():
@@ -207,6 +217,36 @@ def check_song_end():
             return
     root.after(1000, check_song_end)
 
+def delete_current_song():
+    global player, current_index, current_index_playing
+
+    sel = tree.selection()
+    if not sel: return
+    idx = tree.index(sel[0])
+    if idx < 0 or idx >= len(playlist): return
+
+    if player and current_index_playing == idx:
+        stop_song()
+        player = None
+
+    del playlist[idx]
+    tree.delete(sel[0])
+    renumber_tree()
+
+    if idx < len(playlist):
+        current_index = idx
+    else:
+        current_index = len(playlist) - 1
+
+    if playlist:
+        tree.selection_set(tree.get_children()[current_index])
+        tree.focus(tree.get_children()[current_index])
+        tree.see(tree.get_children()[current_index])
+    else:
+        current_index = 0
+
+    json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
+
 PLAYLIST_FILE = "last_playlist.json"
 playlist, current_index, paused, player, current_song_length = [], 0, False, None, 0
 
@@ -306,8 +346,12 @@ tk.Button(btn2_frame, text="Add songs", command=lambda: add_songs(), font=font_m
           bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=1, padx=2)
 
 # === Clear Button ===
-tk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), font=font_main,
+tk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(), font=font_main,
           bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=2, padx=2)
+
+# === Clear Button ===
+tk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), font=font_main,
+          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=3, padx=2)
 
 
 # === Start ===

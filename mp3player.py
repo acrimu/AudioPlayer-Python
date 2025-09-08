@@ -37,7 +37,7 @@ def add_song_to_list(path):
     playlist.append(path)
     tree.insert("", "end", values=(title, artist, f"{dur//60:02}:{dur%60:02}"))
     
-def load_folder():
+def add_folder():
     folder = filedialog.askdirectory()
     if not folder: return
     playlist.clear(); tree.delete(*tree.get_children())
@@ -291,7 +291,7 @@ btn2_frame = tk.Frame(root, bg=bg_main)
 btn2_frame.pack(pady=12)
 
 # === Load Folder Button ===
-tk.Button(btn2_frame, text="Load Folder", command=lambda: load_folder(), font=font_main,
+tk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(), font=font_main,
           bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=0, padx=2)
 
 # === Add Songs Button ===

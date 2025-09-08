@@ -72,7 +72,10 @@ def add_songs():
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 
 def clear_songs_list():
+    if player:
+        stop_song()
     playlist.clear(); tree.delete(*tree.get_children())
+    json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 
 def load_saved_playlist():
     if not os.path.exists(PLAYLIST_FILE): return

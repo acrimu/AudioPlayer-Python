@@ -35,7 +35,13 @@ def add_song_to_list(path):
     dur = get_audio_duration(path)
 
     playlist.append(path)
-    tree.insert("", "end", values=(title, artist, f"{dur//60:02}:{dur%60:02}"))
+    
+    if tree.get_children():
+        number_of_songs= tree.get_children().__len__()
+    else:
+        number_of_songs = 0
+        
+    tree.insert("", "end", values=(str(number_of_songs+1), title, artist, f"{dur//60:02}:{dur%60:02}"))
     
 def add_folder():
     folder = filedialog.askdirectory()
@@ -221,10 +227,11 @@ btn_color = "#3a3a3a"
 tree_frame = tk.Frame(root, bg=bg_main)
 tree_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 5))
 
-columns = ("Title", "Artist", "Duration")
+columns = ("No.", "Title", "Artist", "Duration")
 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
 for col in columns:
     tree.heading(col, text=col)
+tree.column("No.", width=30)
 tree.column("Title", width=300)
 tree.column("Artist", width=280)
 tree.column("Duration", width=100, anchor='center')

@@ -233,11 +233,6 @@ def delete_current_song():
     tree.delete(sel[0])
     renumber_tree()
 
-    # if idx < len(playlist):
-    #     current_index = idx
-    # else:
-    #     current_index = len(playlist) - 1
-
     if player:
         if current_index_playing >= idx:
             current_index_playing -= 1
@@ -252,6 +247,40 @@ def delete_current_song():
         current_index = 0
 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
+
+def save_playlist_as():
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".json",
+        filetypes=[("JSON Playlist", "*.json"), ("All Files", "*.*")],
+        title="Save Playlist As"
+    )
+    if file_path:
+        with open(file_path, "w") as f:
+            json.dump({"playlist": playlist}, f)
+
+def load_playlist_from_file():
+    file_path = filedialog.askopenfilename(
+        defaultextension=".json",
+        filetypes=[("JSON Playlist", "*.json"), ("All Files", "*.*")],
+        title="Load Playlist"
+    )
+    if file_path:
+        try:
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                playlist.clear()
+                tree.delete(*tree.get_children())
+                for path in data.get("playlist", []):
+                    add_song_to_list(path)
+        except Exception as e:
+            tk.messagebox.showerror("Error", f"Failed to load playlist:\n{e}")
+
+        # Select the first song if available
+        if tree.get_children():
+            first_item = tree.get_children()[0]
+            tree.selection_set(first_item)
+            tree.focus(first_item)
+            tree.see(first_item)
 
 # === Context Menu ===
 def show_context_menu(event):
@@ -368,6 +397,14 @@ tk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(), font
 # === Clear Button ===
 tk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), font=font_main,
           bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=3, padx=2)
+
+# === Save Playlist Button ===
+tk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as, font=font_main,
+          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=4, padx=2)
+
+# === Load Playlist Button ===
+tk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file, font=font_main,
+          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=5, padx=2)
 
 context_menu = tk.Menu(root, tearoff=0)
 context_menu.add_command(label="Delete from list", command=lambda: delete_current_song())

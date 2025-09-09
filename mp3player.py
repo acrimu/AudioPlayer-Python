@@ -101,6 +101,8 @@ def load_saved_playlist():
             add_song_to_list(path)
     except: pass
 
+    json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
+
     # 👇 Select the first song if available
     if tree.get_children():
         first_item = tree.get_children()[0]
@@ -121,8 +123,6 @@ def play_selected():
     
     if sel:
         play_song()
-
-
         
 def play_song():
     global player, current_song_length, current_index_playing

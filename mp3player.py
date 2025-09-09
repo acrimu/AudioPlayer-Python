@@ -233,10 +233,16 @@ def delete_current_song():
     tree.delete(sel[0])
     renumber_tree()
 
-    if idx < len(playlist):
-        current_index = idx
-    else:
-        current_index = len(playlist) - 1
+    # if idx < len(playlist):
+    #     current_index = idx
+    # else:
+    #     current_index = len(playlist) - 1
+
+    if player:
+        if current_index_playing >= idx:
+            current_index_playing -= 1
+
+    current_index = current_index_playing
 
     if playlist:
         tree.selection_set(tree.get_children()[current_index])
@@ -246,6 +252,16 @@ def delete_current_song():
         current_index = 0
 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
+
+# === Context Menu ===
+def show_context_menu(event):
+    # Select the row under mouse
+    row_id = tree.identify_row(event.y)
+    if row_id:
+        tree.selection_set(row_id)
+        context_menu.tk_popup(event.x_root, event.y_root)
+
+
 
 PLAYLIST_FILE = "last_playlist.json"
 playlist, current_index, paused, player, current_song_length = [], 0, False, None, 0
@@ -352,6 +368,12 @@ tk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(), font
 # === Clear Button ===
 tk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), font=font_main,
           bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=3, padx=2)
+
+context_menu = tk.Menu(root, tearoff=0)
+context_menu.add_command(label="Delete from list", command=lambda: delete_current_song())
+
+#tree.bind("<Button-3>", show_context_menu)  # Right-click on Windows/Linux
+tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 
 
 # === Start ===

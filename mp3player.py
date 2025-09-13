@@ -273,7 +273,7 @@ def load_playlist_from_file():
                 for path in data.get("playlist", []):
                     add_song_to_list(path)
         except Exception as e:
-            tk.messagebox.showerror("Error", f"Failed to load playlist:\n{e}")
+            ttk.messagebox.showerror("Error", f"Failed to load playlist:\n{e}")
 
         # Select the first song if available
         if tree.get_children():
@@ -297,28 +297,30 @@ playlist, current_index, paused, player, current_song_length = [], 0, False, Non
 
 # === Setup GUI ===
 root = tk.Tk()
+#style = ttk.Style(root)
+#style.theme_use("clam")  # Better button look
 root.title("🎵 MP3 Player")
 root.geometry("720x580")
 root.minsize(650, 500)
-root.configure(bg="#2c2c2c")
+#root.configure(bg="#2c2c2c")
 
 # === Fonts and Colors ===
-font_main = ("Segoe UI", 11)
-bg_main = "#2c2c2c"
-fg_main = "#808080"
-btn_color = "#3a3a3a"
+#font_main = ("Segoe UI", 11)
+#bg_main = "#2c2c2c"
+#fg_main = "#808080"
+#btn_color = "#3a3a3a"
 
 # === Treeview ===
-tree_frame = tk.Frame(root, bg=bg_main)
+tree_frame = ttk.Frame(root)
 tree_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 5))
 
 columns = ("No.", "Title", "Artist", "Duration")
 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
 for col in columns:
     tree.heading(col, text=col)
-tree.column("No.", width=30)
+tree.column("No.", width=40)
 tree.column("Title", width=300)
-tree.column("Artist", width=280)
+tree.column("Artist", width=180)
 tree.column("Duration", width=100, anchor='center')
 
 scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
@@ -331,22 +333,22 @@ tree_frame.grid_columnconfigure(0, weight=1)
 
 # === Now Playing Label ===
 label_var = tk.StringVar()
-tk.Label(root, textvariable=label_var, font=font_main, fg=fg_main, bg=bg_main).pack(pady=(5, 5))
+ttk.Label(root, textvariable=label_var).pack(pady=(5, 5))
 
 # === Progress + Time ===
 progress_bar = ttk.Progressbar(root, orient="horizontal", length=600, mode="determinate")
 progress_bar.pack(pady=4)
 progress_bar.bind("<Button-1>", lambda e: seek_progress(e))
 
-time_label = tk.Label(root, text="", font=font_main, fg=fg_main, bg=bg_main)
+time_label = ttk.Label(root, text="")
 time_label.pack()
 
 # === Buttons ===
-btn_frame = tk.Frame(root, bg=bg_main)
+btn_frame = ttk.Frame(root)
 btn_frame.pack(pady=12)
 
 def add_btn(txt, cmd, col): 
-    tk.Button(btn_frame, text=txt, font=font_main, command=cmd, width=5, bg=btn_color, fg=fg_main, relief=tk.FLAT)\
+    ttk.Button(btn_frame, text=txt, command=cmd, width=5)\
         .grid(row=0, column=col, padx=6)
 
 add_btn("Prev", lambda: skip(-1), 0)
@@ -356,10 +358,10 @@ add_btn("Stop", stop_song, 3)
 add_btn("Next", lambda: skip(1), 4)
 
 # === Volume Slider with 0–150% and % Display ===
-vol_frame = tk.Frame(root, bg=bg_main)
+vol_frame = ttk.Frame(root)
 vol_frame.pack(pady=5)
 
-tk.Label(vol_frame, text="Volume", font=font_main, bg=bg_main, fg=fg_main).pack(side=tk.LEFT)
+ttk.Label(vol_frame, text="Volume").pack(side=tk.LEFT)
 
 volume_percent = tk.StringVar(value="100%")  # Default: 100%
 
@@ -370,41 +372,41 @@ def on_volume_change(val):
         player.audio_set_volume(min(percent, 150))  # VLC max = 150
 
 volume_slider = tk.Scale(vol_frame, from_=0, to=150, orient=tk.HORIZONTAL, resolution=1,
-                         command=on_volume_change, bg=bg_main, fg=fg_main,
+                         command=on_volume_change,
                          troughcolor="#555", highlightthickness=0, sliderlength=15, width=10,
                          showvalue=0, length=150)
 volume_slider.set(100)  # Default value
 volume_slider.pack(side=tk.LEFT, padx=8)
 
-tk.Label(vol_frame, textvariable=volume_percent, font=font_main, bg=bg_main, fg=fg_main).pack(side=tk.LEFT, padx=6)
+ttk.Label(vol_frame, textvariable=volume_percent).pack(side=tk.LEFT, padx=6)
 
 # === Buttons ===
-btn2_frame = tk.Frame(root, bg=bg_main)
+btn2_frame = ttk.Frame(root)
 btn2_frame.pack(pady=12)
 
 # === Load Folder Button ===
-tk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(), font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=0, padx=2)
+ttk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(),
+           ).grid(row=0, column=0, padx=2)
 
 # === Add Songs Button ===
-tk.Button(btn2_frame, text="Add songs", command=lambda: add_songs(), font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=1, padx=2)
+ttk.Button(btn2_frame, text="Add songs", command=lambda: add_songs(),
+           ).grid(row=0, column=1, padx=2)
 
 # === Clear Button ===
-tk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(), font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=2, padx=2)
+ttk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(),
+           ).grid(row=0, column=2, padx=2)
 
 # === Clear Button ===
-tk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=3, padx=2)
+ttk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(),
+           ).grid(row=0, column=3, padx=2)
 
 # === Save Playlist Button ===
-tk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as, font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=4, padx=2)
+ttk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as,
+           ).grid(row=0, column=4, padx=2)
 
 # === Load Playlist Button ===
-tk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file, font=font_main,
-          bg=btn_color, fg=fg_main, padx=6, pady=2, relief=tk.FLAT).grid(row=0, column=5, padx=2)
+ttk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file,
+           ).grid(row=0, column=5, padx=2)
 
 context_menu = tk.Menu(root, tearoff=0)
 context_menu.add_command(label="Delete from list", command=lambda: delete_current_song())

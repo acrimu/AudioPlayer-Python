@@ -52,9 +52,12 @@ def add_song_to_list(path):
     renumber_tree() 
 
 def add_folder():
-    folder = filedialog.askdirectory()
+    global last_opened_folder
+    folder = filedialog.askdirectory(initialdir=last_opened_folder, title="Select Folder")
+    #folder = filedialog.askdirectory()
     if not folder: return
-    playlist.clear(); tree.delete(*tree.get_children())
+    last_opened_folder = folder
+    # playlist.clear(); tree.delete(*tree.get_children())
     for file in sorted(os.listdir(folder)):
         supported_ext = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
         if file.lower().endswith(supported_ext):
@@ -74,15 +77,19 @@ def add_folder():
         tree.see(first_item)
 
 def add_songs():
-    song_tmp = filedialog.askopenfilenames(title="Select Audio Files",
-                                           filetypes=[("Audio Files", "*.mp3 *.wav *.flac *.ogg *.aac *.m4a *.wma"),
-                                                      ("All Files", "*.*")])
+    global last_opened_folder
+    song_tmp = filedialog.askopenfilenames(
+        title="Select Audio Files",
+        initialdir=last_opened_folder,
+        filetypes=[("Audio Files", "*.mp3 *.wav *.flac *.ogg *.aac *.m4a *.wma"),
+                   ("All Files", "*.*")]
+    )
     if not song_tmp: return
-    #playlist.clear(); tree.delete(*tree.get_children())
+    # Remember the folder of the first selected file
+    last_opened_folder = os.path.dirname(song_tmp[0])
     for file in sorted(song_tmp):
         supported_ext = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
         if file.lower().endswith(supported_ext):
-            #path = os.path.join(folder, file)
             add_song_to_list(file)
     renumber_tree()
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
@@ -294,6 +301,7 @@ def show_context_menu(event):
 
 PLAYLIST_FILE = "last_playlist.json"
 playlist, current_index, paused, player, current_song_length = [], 0, False, None, 0
+last_opened_folder = os.path.expanduser("~")  # Default to home folder
 
 # === Setup GUI ===
 root = tk.Tk()

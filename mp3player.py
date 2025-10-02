@@ -213,14 +213,23 @@ def wait_for_playing_and_update():
         root.after(200, wait_for_playing_and_update)  # Retry in 200 ms
 
 def check_song_end():
-    global player
+    global player, current_index
     if player is not None:
         state = player.get_state()
         if state == vlc.State.Ended:
             progress_bar['value'] = 0
             time_label.config(text="")
-            if not paused and current_index < len(playlist) - 1:
-                skip(1)
+            if not paused:
+                if current_index < len(playlist) - 1:
+                    skip(1)
+                elif len(playlist) > 0:
+                    current_index = 0
+                    play_song()
+                    # --- Ensure the first song is selected in the tree ---
+                    first_item = tree.get_children()[0]
+                    tree.selection_set(first_item)
+                    tree.focus(first_item)
+                    tree.see(first_item)
             return
     root.after(1000, check_song_end)
 

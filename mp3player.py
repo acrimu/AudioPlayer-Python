@@ -3,6 +3,9 @@ from tkinter import ttk, filedialog
 import os, json, vlc
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
+import objc
+from Foundation import NSObject
+from Cocoa import NSWorkspace
 
 # === Logic ===
 
@@ -431,6 +434,17 @@ context_menu.add_command(label="Delete from list", command=lambda: delete_curren
 #tree.bind("<Button-3>", show_context_menu)  # Right-click on Windows/Linux
 tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 
+class SleepListener(NSObject):
+    def init(self):
+        NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
+            self, objc.selector(self.handleSleep_, signature=b'v@:@'),
+            "NSWorkspaceWillSleepNotification", None)
+        return self
+
+    def handleSleep_(self, notification):
+        pause_song()
+
+sleep_listener = SleepListener.alloc().init()
 
 # === Start ===
 load_saved_playlist()

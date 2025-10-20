@@ -14,6 +14,8 @@ import tkinter as tk
 SUPPORTED_EXTS = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
 
 # === Logic ===
+global current_index_playing
+current_index_playing = -1
 
 def get_audio_duration(filepath):
     """Try VLC first (works for most formats). Fall back to mutagen if VLC fails."""
@@ -44,6 +46,38 @@ def renumber_tree():
         values = list(tree.item(item, "values"))
         values[0] = str(idx)
         tree.item(item, values=values)
+
+# --- play marker helpers ---
+def clear_playing_mark():
+    """Remove playing marker (▶) and tags from all rows."""
+    for item in tree.get_children():
+        vals = list(tree.item(item, "values"))
+        if vals and len(vals) > 1 and isinstance(vals[1], str) and vals[1].startswith("▶ "):
+            vals[1] = vals[1][2:]
+            tree.item(item, values=vals)
+        # clear tags for safety
+        tree.item(item, tags=())
+
+def mark_playing_item(index):
+    """Mark the row at `index` as playing (add ▶ prefix + 'playing' tag) and clear others."""
+    children = tree.get_children()
+    if not children:
+        return
+    for i, item in enumerate(children):
+        vals = list(tree.item(item, "values"))
+        # ensure there's a title column
+        if not vals or len(vals) < 2:
+            continue
+        if i == index:
+            if not vals[1].startswith("▶ "):
+                vals[1] = "▶ " + vals[1]
+                tree.item(item, values=vals)
+            tree.item(item, tags=("playing",))
+        else:
+            if vals[1].startswith("▶ "):
+                vals[1] = vals[1][2:]
+                tree.item(item, values=vals)
+            tree.item(item, tags=())
 
 def add_song_to_list(path):
     """Add a file to playlist and populate sensible title/artist for many formats."""
@@ -178,8 +212,9 @@ def play_song():
     if player and player.get_state() == vlc.State.Playing and current_index_playing == current_index:
         return
     stop_song()
-    current_index_playing = current_index
-    song = playlist[current_index]
+    if current_index_playing < 0:
+        current_index_playing = current_index
+    song = playlist[current_index_playing]
     player = vlc.MediaPlayer(song)
     player.audio_set_volume(int(volume_slider.get()))
     player.play()
@@ -192,7 +227,8 @@ def play_song():
     label_var.set(f"🎵 Now playing: {os.path.basename(song)}")
     wait_for_playing_and_update()
     check_song_end()
-    tree.selection_set(tree.get_children()[current_index])
+    #tree.selection_set(tree.get_children()[current_index])
+    mark_playing_item(current_index_playing)
 
 def pause_song():
     global paused
@@ -203,15 +239,18 @@ def pause_song():
             wait_for_playing_and_update()
 
 def stop_song():
+    global paused
     paused = False
     if player: player.stop()
     progress_bar['value'] = 0
     label_var.set("⏹ Stopped")
     time_label.config(text="")
+    # clear visual playing mark when stopping
+    clear_playing_mark()
 
 def skip(step):
-    global current_index
-    current_index = (current_index + step) % len(playlist)
+    global current_index_playing
+    current_index_playing = (current_index_playing + step) % len(playlist)
     play_song()
 
 def update_progress():
@@ -233,7 +272,7 @@ def update_progress():
     elif player and player.get_state() == vlc.State.Ended:
         progress_bar['value'] = 0
         time_label.config(text="")
-        if not paused and current_index < len(playlist) - 1:
+        if not paused and current_index_playing < len(playlist) - 1:
             skip(1)
 
 def seek_progress(e):
@@ -255,22 +294,22 @@ def wait_for_playing_and_update():
         root.after(200, wait_for_playing_and_update)  # Retry in 200 ms
 
 def check_song_end():
-    global player, current_index
+    global player, current_index_playing
     if player is not None:
         state = player.get_state()
         if state == vlc.State.Ended:
             progress_bar['value'] = 0
             time_label.config(text="")
             if not paused:
-                if current_index < len(playlist) - 1:
+                if current_index_playing < len(playlist) - 1:
                     skip(1)
                 elif len(playlist) > 0:
-                    current_index = 0
+                    current_index_playing = 0
                     play_song()
                     # --- Ensure the first song is selected in the tree ---
                     first_item = tree.get_children()[0]
-                    tree.selection_set(first_item)
-                    tree.focus(first_item)
+                    #tree.selection_set(first_item)
+                    #tree.focus(first_item)
                     tree.see(first_item)
             return
     root.after(1000, check_song_end)
@@ -390,6 +429,10 @@ tree.column("No.", width=40)
 tree.column("Title", width=300)
 tree.column("Artist", width=180)
 tree.column("Duration", width=100, anchor='center')
+
+# configure a tag style for the playing item (change foreground to desired color)
+# foreground = text color, background = row background
+tree.tag_configure("playing", background="#6A6153", foreground="#8dff96")
 
 scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=scroll.set)

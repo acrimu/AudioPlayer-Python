@@ -1,26 +1,42 @@
-import tkinter as tk
-from tkinter import ttk, filedialog
-import os, json, vlc
+import vlc
+import os
+import json
+import time
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 import objc
 from Foundation import NSObject
 from Cocoa import NSWorkspace
+from tkinter import ttk, filedialog
+import tkinter as tk
+
+# Supported audio extensions (used by dialogs and folder scanning)
+SUPPORTED_EXTS = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
 
 # === Logic ===
 
 def get_audio_duration(filepath):
-    ext = os.path.splitext(filepath)[1].lower()
-
+    """Try VLC first (works for most formats). Fall back to mutagen if VLC fails."""
     try:
         instance = vlc.Instance()
         media = instance.media_new(filepath)
-        media.parse()  # blocking
-        dur = media.get_duration()
-        return int(dur / 1000) if dur > 0 else 0
+        # blocking parse to ensure duration available
+        media.parse()
+        dur_ms = media.get_duration()
+        if dur_ms and dur_ms > 0:
+            return int(dur_ms / 1000)
+    except Exception:
+        pass
 
-    except:
-        return 0
+    # Fallback to mutagen (gives length in seconds if supported)
+    try:
+        audio = MutagenFile(filepath)
+        if audio and hasattr(audio, "info") and getattr(audio.info, "length", None):
+            return int(audio.info.length)
+    except Exception:
+        pass
+
+    return 0
 
 def renumber_tree():
     """Update the 'No.' column to reflect the current order in the tree."""
@@ -30,54 +46,74 @@ def renumber_tree():
         tree.item(item, values=values)
 
 def add_song_to_list(path):
-    if not os.path.isfile(path): return
-    try:
-        tags = EasyID3(path)
-        title = tags.get("title", [os.path.basename(path)])[0]
-        artist = tags.get("artist", ["Unknown"])[0]
-    except:
-        title = os.path.basename(path)
-        artist = "Unknown"
+    """Add a file to playlist and populate sensible title/artist for many formats."""
+    if not os.path.isfile(path):
+        return
+
     ext = os.path.splitext(path)[1].lower()
-    if ext != ".mp3":
-        title += f" [{ext[1:].upper()}]"
-    
+    basename = os.path.basename(path)
+    title = basename
+    artist = "Unknown"
+
+    # MP3: prefer EasyID3
+    if ext == ".mp3":
+        try:
+            tags = EasyID3(path)
+            title = tags.get("title", [basename])[0]
+            artist = tags.get("artist", ["Unknown"])[0]
+        except Exception:
+            pass
+    else:
+        # Other formats: use mutagen generic File and try common tag keys
+        try:
+            audio = MutagenFile(path)
+            if audio and audio.tags:
+                # try common keys (many formats provide lists)
+                def first_tag(tags, *keys):
+                    for k in keys:
+                        if k in tags:
+                            v = tags[k]
+                            try:
+                                return v[0] if isinstance(v, (list, tuple)) else str(v)
+                            except Exception:
+                                return str(v)
+                    return None
+
+                t = first_tag(audio.tags, "title", "TITLE", "TIT2", "\xa9nam")
+                a = first_tag(audio.tags, "artist", "ARTIST", "TPE1", "\xa9ART")
+                if t:
+                    title = t
+                if a:
+                    artist = a
+        except Exception:
+            pass
+
+    # Append extension label for non-mp3 files (optional UI hint)
+    if ext != ".mp3" and ext:
+        title = f"{title} [{ext[1:].upper()}]"
+
     dur = get_audio_duration(path)
 
     playlist.append(path)
-    
-    if tree.get_children():
-        number_of_songs= tree.get_children().__len__()
-    else:
-        number_of_songs = 0
-        
-    tree.insert("", "end", values=(str(number_of_songs+1), title, artist, f"{dur//60:02}:{dur%60:02}"))
-    renumber_tree() 
+    number_of_songs = len(tree.get_children())
+    tree.insert("", "end", values=(str(number_of_songs + 1), title, artist, f"{dur//60:02}:{dur%60:02}"))
+    renumber_tree()
 
 def add_folder():
     global last_opened_folder
-    folder = filedialog.askdirectory(initialdir=last_opened_folder, title="Select Folder")
-    #folder = filedialog.askdirectory()
-    if not folder: return
-    last_opened_folder = folder
-    # playlist.clear(); tree.delete(*tree.get_children())
+    folder = filedialog.askdirectory(initialdir=last_opened_folder)
+    if not folder:
+        return
+    playlist.clear()
+    tree.delete(*tree.get_children())
     for file in sorted(os.listdir(folder)):
-        supported_ext = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
-        if file.lower().endswith(supported_ext):
+        if file.lower().endswith(SUPPORTED_EXTS):
             path = os.path.join(folder, file)
             add_song_to_list(path)
-    renumber_tree() 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
-
-    if player:
-        stop_song()
-
-    # 👇 Select the first song if available
-    if tree.get_children():
-        first_item = tree.get_children()[0]
-        tree.selection_set(first_item)
-        tree.focus(first_item)
-        tree.see(first_item)
+    # remember last opened folder
+    #global last_opened_folder
+    last_opened_folder = folder
 
 def add_songs():
     global last_opened_folder
@@ -87,12 +123,12 @@ def add_songs():
         filetypes=[("Audio Files", "*.mp3 *.wav *.flac *.ogg *.aac *.m4a *.wma"),
                    ("All Files", "*.*")]
     )
-    if not song_tmp: return
+    if not song_tmp:
+        return
     # Remember the folder of the first selected file
     last_opened_folder = os.path.dirname(song_tmp[0])
     for file in sorted(song_tmp):
-        supported_ext = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
-        if file.lower().endswith(supported_ext):
+        if file.lower().endswith(SUPPORTED_EXTS):
             add_song_to_list(file)
     renumber_tree()
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
@@ -104,12 +140,15 @@ def clear_songs_list():
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 
 def load_saved_playlist():
-    if not os.path.exists(PLAYLIST_FILE): return
+    if not os.path.exists(PLAYLIST_FILE):
+        return
     try:
         data = json.load(open(PLAYLIST_FILE))
         for path in data.get("playlist", []):
-            add_song_to_list(path)
-    except: pass
+            if os.path.exists(path):
+                add_song_to_list(path)
+    except Exception:
+        pass
 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 

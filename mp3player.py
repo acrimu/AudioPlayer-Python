@@ -4,6 +4,8 @@ import json
 import time
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
+from mutagen import File as MutagenFile
+
 import objc
 from Foundation import NSObject
 from Cocoa import NSWorkspace
@@ -14,8 +16,9 @@ import tkinter as tk
 SUPPORTED_EXTS = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
 
 # === Logic ===
-global current_index_playing
+global current_index_playing, index_to_play
 current_index_playing = -1
+index_to_play = -1
 
 def get_audio_duration(filepath):
     """Try VLC first (works for most formats). Fall back to mutagen if VLC fails."""
@@ -58,8 +61,19 @@ def clear_playing_mark():
         # clear tags for safety
         tree.item(item, tags=())
 
-def mark_playing_item(index):
-    """Mark the row at `index` as playing (add ▶ prefix + 'playing' tag) and clear others."""
+# --- play marker helpers ---
+def clear_stop_mark():
+    """Remove playing marker (▶) and tags from all rows."""
+    for item in tree.get_children():
+        vals = list(tree.item(item, "values"))
+        if vals and len(vals) > 1 and isinstance(vals[1], str) and vals[1].startswith("■ "):
+            vals[1] = vals[1][2:]
+            tree.item(item, values=vals)
+        # clear tags for safety
+        tree.item(item, tags=())
+
+def mark_pause_item(index):
+    """Mark the row at `index` as pause (add ⏸ prefix + 'playing' tag) and clear others."""
     children = tree.get_children()
     if not children:
         return
@@ -69,12 +83,39 @@ def mark_playing_item(index):
         if not vals or len(vals) < 2:
             continue
         if i == index:
+            # remove stop marker if present
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
+                vals[1] = vals[1][2:]
+            if not vals[1].startswith("⏸ "):
+                vals[1] = "⏸ " + vals[1]
+                tree.item(item, values=vals)
+            tree.item(item, tags=("playing",))
+        else:
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
+                vals[1] = vals[1][2:]
+                tree.item(item, values=vals)
+            tree.item(item, tags=())
+
+def mark_playing_item(index):
+    """Mark the row at `index` as pause (add ⏸ prefix + 'playing' tag) and clear others."""
+    children = tree.get_children()
+    if not children:
+        return
+    for i, item in enumerate(children):
+        vals = list(tree.item(item, "values"))
+        # ensure there's a title column
+        if not vals or len(vals) < 2:
+            continue
+        if i == index:
+            # remove stop marker if present
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
+                vals[1] = vals[1][2:]
             if not vals[1].startswith("▶ "):
                 vals[1] = "▶ " + vals[1]
                 tree.item(item, values=vals)
             tree.item(item, tags=("playing",))
         else:
-            if vals[1].startswith("▶ "):
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
                 vals[1] = vals[1][2:]
                 tree.item(item, values=vals)
             tree.item(item, tags=())
@@ -194,7 +235,7 @@ def load_saved_playlist():
         tree.see(first_item)
 
 def play_selected():
-    global current_index
+    global current_index, index_to_play, current_index_playing
     sel = tree.selection()
     if sel:
         current_index = tree.index(sel[0])
@@ -205,15 +246,18 @@ def play_selected():
         return
     
     if sel:
+        index_to_play = current_index
         play_song()
         
 def play_song():
-    global player, current_song_length, current_index_playing
-    if player and player.get_state() == vlc.State.Playing and current_index_playing == current_index:
+    global player, current_song_length, current_index_playing, index_to_play
+    if player and player.get_state() == vlc.State.Playing and current_index_playing == index_to_play:
         return
     stop_song()
-    if current_index_playing < 0:
-        current_index_playing = current_index
+    clear_stop_mark()
+    if index_to_play < 0:
+        index_to_play = current_index
+    current_index_playing = index_to_play
     song = playlist[current_index_playing]
     player = vlc.MediaPlayer(song)
     player.audio_set_volume(int(volume_slider.get()))
@@ -235,22 +279,56 @@ def pause_song():
     if player:
         (player.play() if paused else player.pause())
         paused = not paused
-        if not paused:
+
+        if paused:
+            mark_pause_item(current_index_playing)
+        else:
+            mark_playing_item(current_index_playing)
             wait_for_playing_and_update()
+
+def mark_stopped_item(index):
+    """Mark the row at `index` as stopped (■ prefix) but keep the same tag/colors."""
+    children = tree.get_children()
+    if not children:
+        return
+    for i, item in enumerate(children):
+        vals = list(tree.item(item, "values"))
+        if not vals or len(vals) < 2:
+            continue
+        if i == index:
+            # remove playing marker if present
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
+                vals[1] = vals[1][2:]
+            # add stopped marker if not present
+            if not vals[1].startswith("■ "):
+                vals[1] = "■ " + vals[1]
+                tree.item(item, values=vals)
+            # keep the same visual tag so colors remain
+            tree.item(item, tags=("playing",))
+        else:
+            # remove stopped marker from other rows
+            if vals[1].startswith("▶ ") or vals[1].startswith("⏸ ") or vals[1].startswith("■ "):
+                vals[1] = vals[1][2:]
+                tree.item(item, values=vals)
+            tree.item(item, tags=())
 
 def stop_song():
     global paused
     paused = False
-    if player: player.stop()
+    if player:
+        player.stop()
     progress_bar['value'] = 0
     label_var.set("⏹ Stopped")
     time_label.config(text="")
-    # clear visual playing mark when stopping
+    # keep the same background/foreground for the last played item
     clear_playing_mark()
+    if 0 <= current_index_playing < len(playlist):
+        mark_stopped_item(current_index_playing)
+        
 
 def skip(step):
-    global current_index_playing
-    current_index_playing = (current_index_playing + step) % len(playlist)
+    global index_to_play
+    index_to_play = (index_to_play + step) % len(playlist)
     play_song()
 
 def update_progress():

@@ -279,11 +279,15 @@ def delete_current_song():
     global player, current_index, current_index_playing
 
     sel = tree.selection()
-    if not sel: return
+    if not sel:
+        return
     idx = tree.index(sel[0])
-    if idx < 0 or idx >= len(playlist): return
+    if idx < 0 or idx >= len(playlist):
+        return
 
-    if player and current_index_playing == idx:
+    was_playing_deleted = (player is not None and current_index_playing == idx)
+
+    if was_playing_deleted:
         stop_song()
         player = None
 
@@ -291,18 +295,23 @@ def delete_current_song():
     tree.delete(sel[0])
     renumber_tree()
 
-    if player:
-        if current_index_playing >= idx:
-            current_index_playing -= 1
-
-    current_index = current_index_playing
+    # adjust playing index if it was after deleted index
+    if player is not None and current_index_playing > idx:
+        current_index_playing -= 1
 
     if playlist:
-        tree.selection_set(tree.get_children()[current_index])
-        tree.focus(tree.get_children()[current_index])
-        tree.see(tree.get_children()[current_index])
+        # select next item: same index if it exists, otherwise the new last item
+        new_index = idx if idx < len(playlist) else len(playlist) - 1
+        current_index = new_index
+        if was_playing_deleted:
+            current_index_playing = current_index
+        item = tree.get_children()[current_index]
+        tree.selection_set(item)
+        tree.focus(item)
+        tree.see(item)
     else:
         current_index = 0
+        current_index_playing = 0
 
     json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
 

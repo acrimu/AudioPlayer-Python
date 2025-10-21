@@ -484,7 +484,7 @@ last_opened_folder = os.path.expanduser("~")  # Default to home folder
 root = tk.Tk()
 #style = ttk.Style(root)
 #style.theme_use("clam")  # Better button look
-root.title("🎵 MP3 Player")
+root.title("🎵 Audio Player")
 root.geometry("720x580")
 root.minsize(650, 500)
 #root.configure(bg="#2c2c2c")

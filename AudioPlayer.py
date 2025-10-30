@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================================================
- Project:   MP3 Player (Cross-Platform Python Audio Player)
- File:      mp3player.py
- Author:    Dani Crone (Adrian Crimu)
+ Project:   Audio Player (Cross-Platform Python Audio Player)
+ File:      AudioPlayer.py
+ Author:    Adrian Crimu
  GitHub:    https://github.com/<your-username>/<your-repo-name>
  License:   MIT License
  Created:   2025-10-30
@@ -22,7 +22,7 @@
     • Drag & drop, folder or file add
     • Move songs up/down in the playlist
     • Context menu with right-click / two-finger click
-    • Volume control (0–150%)
+    • Volume control (0-150%)
     • macOS sleep prevention using `caffeinate`
     • Automatic pause when the system goes to sleep
 
@@ -36,7 +36,7 @@
         - json, os, sys, subprocess (standard)
 
  Run:
-    $ python3 mp3player.py
+    $ python3 AudioPlayer.py
 
 ===============================================================================
 """

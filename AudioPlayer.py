@@ -5,7 +5,7 @@
  Project:   Audio Player (Cross-Platform Python Audio Player)
  File:      AudioPlayer.py
  Author:    Adrian Crimu
- GitHub:    https://github.com/acrimu/mp3player_vlc
+ GitHub:    https://github.com/acrimu/AudioPlayer-Python
  License:   MIT License
  Created:   2025-10-30
 ===============================================================================

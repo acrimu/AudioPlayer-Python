@@ -485,6 +485,95 @@ def load_playlist_from_file():
             tree.focus(first_item)
             tree.see(first_item)
 
+def move_song(old_index, new_index):
+    """Move song in playlist and reorder the Treeview. Keep selection/play indexes in sync."""
+    global current_index, current_index_playing
+    print(f"move_song from {old_index} to {new_index}")
+    if old_index == new_index:
+        return
+    if not (0 <= old_index < len(playlist)) or not (0 <= new_index < len(playlist)):
+        return
+
+    # move in playlist
+    item = playlist.pop(old_index)
+    playlist.insert(new_index, item)
+
+    # capture current tree values and reorder
+    values = [list(tree.item(c, "values")) for c in tree.get_children()]
+    moved_vals = values.pop(old_index)
+    values.insert(new_index, moved_vals)
+
+    # rebuild tree from reordered values
+    tree.delete(*tree.get_children())
+    for i, vals in enumerate(values, start=1):
+        vals[0] = str(i)
+        tree.insert("", "end", values=vals)
+
+    # adjust selection index
+    if current_index == old_index:
+        current_index = new_index
+    elif old_index < current_index <= new_index:
+        current_index -= 1
+    elif new_index <= current_index < old_index:
+        current_index += 1
+
+    # adjust playing index similarly
+    if current_index_playing == old_index:
+        current_index_playing = new_index
+    elif old_index < current_index_playing <= new_index:
+        current_index_playing -= 1
+    elif new_index <= current_index_playing < old_index:
+        current_index_playing += 1
+
+    renumber_tree()
+
+    # restore selection and focus
+    if tree.get_children():
+        #sel_index = max(0, min(current_index, len(tree.get_children()) - 1))
+        item_id = tree.get_children()[new_index]
+        tree.selection_set(item_id)
+        tree.focus(item_id)
+        tree.see(item_id)
+
+    # update visual markers
+    if player is not None:
+        # there's an active player; mark playing item
+        if 0 <= current_index_playing < len(playlist):
+            mark_playing_item(current_index_playing)
+        else:
+            clear_playing_mark()
+    else:
+        # no active player: keep stopped marker if applicable
+        clear_stop_mark()
+        if 0 <= current_index_playing < len(playlist):
+            mark_stopped_item(current_index_playing)
+
+    # persist playlist
+    with open(PLAYLIST_FILE, "w") as f:
+        json.dump({"playlist": playlist}, f)
+
+
+def move_selected_up():
+    print("move_selected_up called")
+    sel = tree.selection()
+    if not sel:
+        return
+    idx = tree.index(sel[0])
+    if idx <= 0:
+        return
+    move_song(idx, idx - 1)
+
+
+def move_selected_down():
+    print("move_selected_down called")
+    sel = tree.selection()
+    if not sel:
+        return
+    idx = tree.index(sel[0])
+    if idx >= len(playlist) - 1:
+        return
+    move_song(idx, idx + 1)
+
 # === Context Menu ===
 def show_context_menu(event):
     # Select the row under mouse
@@ -504,8 +593,8 @@ root = tk.Tk()
 #style = ttk.Style(root)
 #style.theme_use("clam")  # Better button look
 root.title("🎵 Audio Player")
-root.geometry("650x580")
-root.minsize(650, 500)
+root.geometry("750x580")
+root.minsize(750, 500)
 #root.configure(bg="#2c2c2c")
 
 # === Fonts and Colors ===
@@ -619,11 +708,24 @@ ttk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as, wid
 ttk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file, width=BTN2_WIDTH
            ).grid(row=1, column=1, padx=2)
 
+# === Move Up / Move Down Buttons ===
+ttk.Button(btn2_frame, text="Move up", command=lambda: move_selected_up(), width=BTN2_WIDTH
+           ).grid(row=1, column=2, padx=2)
+ttk.Button(btn2_frame, text="Move down", command=lambda: move_selected_down(), width=BTN2_WIDTH
+           ).grid(row=1, column=3, padx=2)
+
+
 context_menu = tk.Menu(root, tearoff=0)
 context_menu.add_command(label="Delete from list", command=lambda: delete_current_song())
+context_menu.add_command(label="Move up", command=lambda: move_selected_up())
+context_menu.add_command(label="Move down", command=lambda: move_selected_down())
 
 #tree.bind("<Button-3>", show_context_menu)  # Right-click on Windows/Linux
 tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
+
+# keyboard shortcuts for quick reordering
+root.bind_all("<Control-Up>", lambda e: move_selected_up())
+root.bind_all("<Control-Down>", lambda e: move_selected_down())
 
 # --- Sleep listener checkbox ---
 sleep_listener_enabled = tk.BooleanVar(value=True)  # default checked
@@ -641,7 +743,7 @@ def toggle_sleep_listener():
             pass
 
 ttk.Checkbutton(btn2_frame, text="Pause on sleep", variable=sleep_listener_enabled,
-                command=toggle_sleep_listener).grid(row=1, column=2, padx=6)
+                command=toggle_sleep_listener).grid(row=1, column=4, padx=6)
 
 # start listener if default enabled
 if sleep_listener_enabled.get():

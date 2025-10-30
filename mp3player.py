@@ -485,7 +485,7 @@ root = tk.Tk()
 #style = ttk.Style(root)
 #style.theme_use("clam")  # Better button look
 root.title("🎵 Audio Player")
-root.geometry("720x580")
+root.geometry("650x580")
 root.minsize(650, 500)
 #root.configure(bg="#2c2c2c")
 
@@ -573,29 +573,32 @@ ttk.Label(vol_frame, textvariable=volume_percent).pack(side=tk.LEFT, padx=6)
 btn2_frame = ttk.Frame(root)
 btn2_frame.pack(pady=12)
 
+# make all six control buttons the same visual width
+BTN2_WIDTH = 12
+
 # === Load Folder Button ===
-ttk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(),
+ttk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(), width=BTN2_WIDTH
            ).grid(row=0, column=0, padx=2)
 
 # === Add Songs Button ===
-ttk.Button(btn2_frame, text="Add songs", command=lambda: add_songs(),
+ttk.Button(btn2_frame, text="Add songs", command=lambda: add_songs(), width=BTN2_WIDTH
            ).grid(row=0, column=1, padx=2)
 
 # === Clear Button ===
-ttk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(),
+ttk.Button(btn2_frame, text="Delete", command=lambda: delete_current_song(), width=BTN2_WIDTH
            ).grid(row=0, column=2, padx=2)
 
 # === Clear Button ===
-ttk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(),
+ttk.Button(btn2_frame, text="Clear", command=lambda: clear_songs_list(), width=BTN2_WIDTH
            ).grid(row=0, column=3, padx=2)
 
 # === Save Playlist Button ===
-ttk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as,
-           ).grid(row=0, column=4, padx=2)
+ttk.Button(btn2_frame, text="Save playlist as...", command=save_playlist_as, width=BTN2_WIDTH
+           ).grid(row=1, column=0, padx=2)
 
 # === Load Playlist Button ===
-ttk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file,
-           ).grid(row=0, column=5, padx=2)
+ttk.Button(btn2_frame, text="Load playlist...", command=load_playlist_from_file, width=BTN2_WIDTH
+           ).grid(row=1, column=1, padx=2)
 
 context_menu = tk.Menu(root, tearoff=0)
 context_menu.add_command(label="Delete from list", command=lambda: delete_current_song())
@@ -603,16 +606,55 @@ context_menu.add_command(label="Delete from list", command=lambda: delete_curren
 #tree.bind("<Button-3>", show_context_menu)  # Right-click on Windows/Linux
 tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 
+# --- Sleep listener checkbox ---
+sleep_listener_enabled = tk.BooleanVar(value=True)  # default checked
+
+def toggle_sleep_listener():
+    if sleep_listener_enabled.get():
+        try:
+            sleep_listener.start()
+        except Exception:
+            pass
+    else:
+        try:
+            sleep_listener.stop()
+        except Exception:
+            pass
+
+ttk.Checkbutton(btn2_frame, text="Pause on sleep", variable=sleep_listener_enabled,
+                command=toggle_sleep_listener).grid(row=1, column=2, padx=6)
+
+# start listener if default enabled
+if sleep_listener_enabled.get():
+    try:
+        sleep_listener.start()
+    except Exception:
+        pass
+
+# === Sleep Listener ===
 class SleepListener(NSObject):
     def init(self):
-        NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
-            self, objc.selector(self.handleSleep_, signature=b'v@:@'),
-            "NSWorkspaceWillSleepNotification", None)
         return self
+
+    def start(self):
+        try:
+            NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
+                self, objc.selector(self.handleSleep_, signature=b'v@:@'),
+                "NSWorkspaceWillSleepNotification", None)
+        except Exception:
+            pass
+
+    def stop(self):
+        try:
+            NSWorkspace.sharedWorkspace().notificationCenter().removeObserver_name_object_(
+                self, "NSWorkspaceWillSleepNotification", None)
+        except Exception:
+            pass
 
     def handleSleep_(self, notification):
         pause_song()
 
+# create instance but don't start automatically here
 sleep_listener = SleepListener.alloc().init()
 
 # === Start ===

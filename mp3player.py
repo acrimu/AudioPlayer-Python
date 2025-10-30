@@ -1,3 +1,47 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+===============================================================================
+ Project:   MP3 Player (Cross-Platform Python Audio Player)
+ File:      mp3player.py
+ Author:    Dani Crone (Adrian Crimu)
+ GitHub:    https://github.com/<your-username>/<your-repo-name>
+ License:   MIT License
+ Created:   2025-10-30
+===============================================================================
+
+ Description:
+    A full-featured, cross-platform MP3/audio player built in Python with Tkinter
+    and VLC. Designed for macOS, Windows, and Linux, featuring a clean interface
+    and playlist persistence.
+
+ Features:
+    • Play, Pause, Stop, Next, Previous
+    • Progress bar with seek and elapsed time
+    • Playlist load/save in JSON format
+    • Drag & drop, folder or file add
+    • Move songs up/down in the playlist
+    • Context menu with right-click / two-finger click
+    • Volume control (0–150%)
+    • macOS sleep prevention using `caffeinate`
+    • Automatic pause when the system goes to sleep
+
+ Requirements:
+    Python 3.8+
+    Modules:
+        - vlc (python-vlc)
+        - mutagen
+        - tkinter (standard library)
+        - objc, Foundation, Cocoa (macOS only)
+        - json, os, sys, subprocess (standard)
+
+ Run:
+    $ python3 mp3player.py
+
+===============================================================================
+"""
+
+
 import vlc
 import os
 import json

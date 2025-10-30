@@ -179,16 +179,35 @@ def add_folder():
     folder = filedialog.askdirectory(initialdir=last_opened_folder)
     if not folder:
         return
-    playlist.clear()
-    tree.delete(*tree.get_children())
-    for file in sorted(os.listdir(folder)):
-        if file.lower().endswith(SUPPORTED_EXTS):
-            path = os.path.join(folder, file)
-            add_song_to_list(path)
-    json.dump({"playlist": playlist}, open(PLAYLIST_FILE, "w"))
+
+    #playlist.clear()
+    #tree.delete(*tree.get_children())
+
+    # Walk folder recursively and add supported files in a stable order
+    for root_dir, dirs, files in os.walk(folder):
+        dirs.sort()
+        for file in sorted(files):
+            if file.lower().endswith(SUPPORTED_EXTS):
+                path = os.path.join(root_dir, file)
+                add_song_to_list(path)
+
     # remember last opened folder
-    #global last_opened_folder
     last_opened_folder = folder
+
+    # update numbers and persist playlist
+    renumber_tree()
+    with open(PLAYLIST_FILE, "w") as f:
+        json.dump({"playlist": playlist}, f)
+
+    if player:
+        stop_song()
+
+    # Select the first song if available
+    if tree.get_children():
+        first_item = tree.get_children()[0]
+        tree.selection_set(first_item)
+        tree.focus(first_item)
+        tree.see(first_item)
 
 def add_songs():
     global last_opened_folder

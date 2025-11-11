@@ -66,38 +66,6 @@ global current_index_playing, index_to_play
 current_index_playing = -1
 index_to_play = -1
 
-# Prevent macOS sleep while playing (uses 'caffeinate' subprocess)
-caffeinate_proc = None
-
-def start_caffeinate():
-    """Start macOS 'caffeinate' to prevent sleep while music plays."""
-    global caffeinate_proc
-    if sys.platform != "darwin":
-        return
-    if caffeinate_proc is not None:
-        return
-    try:
-        caffeinate_proc = subprocess.Popen(["caffeinate", "-dims"],
-                                          stdout=subprocess.DEVNULL,
-                                          stderr=subprocess.DEVNULL)
-    except Exception:
-        caffeinate_proc = None
-
-def stop_caffeinate():
-    """Stop the caffeinate subprocess if running."""
-    global caffeinate_proc
-    if caffeinate_proc is None:
-        return
-    try:
-        caffeinate_proc.terminate()
-        caffeinate_proc.wait(timeout=1)
-    except Exception:
-        try:
-            caffeinate_proc.kill()
-        except Exception:
-            pass
-    caffeinate_proc = None
-
 def get_audio_duration(filepath):
     """Try VLC first (works for most formats). Fall back to mutagen if VLC fails."""
     try:
@@ -361,9 +329,6 @@ def play_song():
     player.play()
     audio = MP3(song)
 
-    # start preventing mac sleep while playing
-    start_caffeinate()
-
     current_song_length = get_audio_duration(song)
     progress_bar["maximum"] = current_song_length
     #print("progress_bar maximum set to ", current_song_length)
@@ -381,12 +346,8 @@ def pause_song():
         paused = not paused
 
         if paused:
-            # allow system to sleep when paused
-            stop_caffeinate()
             mark_pause_item(current_index_playing)
         else:
-            # resume preventing sleep
-            start_caffeinate()
             mark_playing_item(current_index_playing)
             wait_for_playing_and_update()
 
@@ -421,8 +382,6 @@ def stop_song():
     paused = False
     if player:
         player.stop()
-    # stop preventing mac sleep when playback stops
-    stop_caffeinate()
     progress_bar['value'] = 0
     label_var.set("⏹ Stopped")
     time_label.config(text="")

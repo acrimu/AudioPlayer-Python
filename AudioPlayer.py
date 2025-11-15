@@ -816,7 +816,7 @@ root.bind_all("<Control-Up>", lambda e: move_selected_up())
 root.bind_all("<Control-Down>", lambda e: move_selected_down())
 
 # --- Sleep listener checkbox ---
-sleep_listener_enabled = tk.BooleanVar(value=True)  # default checked
+sleep_listener_enabled = tk.BooleanVar(value=True)
 
 def toggle_sleep_listener():
     if sleep_listener_enabled.get():
@@ -832,13 +832,6 @@ def toggle_sleep_listener():
 
 ttk.Checkbutton(btn2_frame, text="Pause on sleep", variable=sleep_listener_enabled,
                 command=toggle_sleep_listener()).grid(row=1, column=4, padx=6)
-
-# start listener if default enabled
-if sleep_listener_enabled.get():
-    try:
-        sleep_listener.start()
-    except Exception:
-        pass
 
 # === Sleep Listener ===
 class SleepListener(NSObject):
@@ -863,8 +856,15 @@ class SleepListener(NSObject):
     def handleSleep_(self, notification):
         pause_song()
 
-# create instance but don't start automatically here
+# Create instance FIRST
 sleep_listener = SleepListener.alloc().init()
+
+# start listener if default enabled
+if sleep_listener_enabled.get():
+    try:
+        sleep_listener.start()
+    except Exception:
+        pass
 
 # === Start ===
 load_saved_playlist()

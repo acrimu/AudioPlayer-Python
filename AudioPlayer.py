@@ -46,6 +46,7 @@ import vlc
 import os
 import json
 import time
+import queue
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 from mutagen import File as MutagenFile
@@ -60,6 +61,9 @@ import subprocess
 
 # Supported audio extensions (used by dialogs and folder scanning)
 SUPPORTED_EXTS = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
+
+# === Thread-safe queue for macOS sleep notifications ===
+sleep_event_queue = queue.Queue()
 
 # === Logic ===
 global current_index_playing, index_to_play
@@ -316,40 +320,55 @@ def play_selected():
         
 def play_song():
     global player, current_song_length, current_index_playing, index_to_play
-    if player and player.get_state() == vlc.State.Playing and current_index_playing == index_to_play:
-        return
+    try:
+        if player and player.get_state() == vlc.State.Playing and current_index_playing == index_to_play:
+            return
+    except Exception:
+        pass
+    
     stop_song()
     clear_stop_mark()
     if index_to_play < 0:
         index_to_play = current_index
     current_index_playing = index_to_play
     song = playlist[current_index_playing]
-    player = vlc.MediaPlayer(song)
-    player.audio_set_volume(int(volume_slider.get()))
-    player.play()
-    audio = MP3(song)
+    
+    try:
+        player = vlc.MediaPlayer(song)
+        player.audio_set_volume(int(volume_slider.get()))
+        player.play()
+    except Exception as e:
+        print(f"Error creating/playing media: {e}")
+        player = None
+        return
+    
+    try:
+        audio = MP3(song)
+    except Exception:
+        pass
 
     current_song_length = get_audio_duration(song)
     progress_bar["maximum"] = current_song_length
-    #print("progress_bar maximum set to ", current_song_length)
 
     label_var.set(f"🎵 Now playing: {os.path.basename(song)}")
     wait_for_playing_and_update()
     check_song_end()
-    #tree.selection_set(tree.get_children()[current_index])
     mark_playing_item(current_index_playing)
 
 def pause_song():
     global paused
     if player:
-        (player.play() if paused else player.pause())
-        paused = not paused
+        try:
+            (player.play() if paused else player.pause())
+            paused = not paused
 
-        if paused:
-            mark_pause_item(current_index_playing)
-        else:
-            mark_playing_item(current_index_playing)
-            wait_for_playing_and_update()
+            if paused:
+                mark_pause_item(current_index_playing)
+            else:
+                mark_playing_item(current_index_playing)
+                wait_for_playing_and_update()
+        except Exception as e:
+            print(f"Error in pause_song: {e}")
 
 def mark_stopped_item(index):
     """Mark the row at `index` as stopped (■ prefix) but keep the same tag/colors."""
@@ -381,7 +400,10 @@ def stop_song():
     global paused
     paused = False
     if player:
-        player.stop()
+        try:
+            player.stop()
+        except Exception as e:
+            print(f"Error stopping player: {e}")
     progress_bar['value'] = 0
     label_var.set("⏹ Stopped")
     time_label.config(text="")
@@ -389,7 +411,6 @@ def stop_song():
     clear_playing_mark()
     if 0 <= current_index_playing < len(playlist):
         mark_stopped_item(current_index_playing)
-        
 
 def skip(step):
     global index_to_play
@@ -774,6 +795,38 @@ tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 root.bind_all("<Control-Up>", lambda e: move_selected_up())
 root.bind_all("<Control-Down>", lambda e: move_selected_down())
 
+# === Sleep Listener ===
+class SleepListener(NSObject):
+    def init(self):
+        objc.super(SleepListener, self).init()
+        return self
+
+    def start(self):
+        try:
+            NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
+                self, objc.selector(self.handleSleep_, signature=b'v@:@'),
+                "NSWorkspaceWillSleepNotification", None)
+        except Exception as e:
+            print(f"Error starting sleep listener: {e}")
+
+    def stop(self):
+        try:
+            NSWorkspace.sharedWorkspace().notificationCenter().removeObserver_name_object_(
+                self, "NSWorkspaceWillSleepNotification", None)
+        except Exception as e:
+            print(f"Error stopping sleep listener: {e}")
+
+    def handleSleep_(self, notification):
+        # Put event in thread-safe queue instead of calling Tkinter directly
+        # This avoids GIL issues with PyObjC running on a different thread
+        try:
+            sleep_event_queue.put("sleep", block=False)
+        except Exception as e:
+            print(f"Error queuing sleep event: {e}")
+
+# create instance
+sleep_listener = SleepListener.alloc().init()
+
 # --- Sleep listener checkbox ---
 sleep_listener_enabled = tk.BooleanVar(value=True)  # default checked
 
@@ -799,32 +852,34 @@ if sleep_listener_enabled.get():
     except Exception:
         pass
 
-# === Sleep Listener ===
-class SleepListener(NSObject):
-    def init(self):
-        return self
-
-    def start(self):
-        try:
-            NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
-                self, objc.selector(self.handleSleep_, signature=b'v@:@'),
-                "NSWorkspaceWillSleepNotification", None)
-        except Exception:
-            pass
-
-    def stop(self):
-        try:
-            NSWorkspace.sharedWorkspace().notificationCenter().removeObserver_name_object_(
-                self, "NSWorkspaceWillSleepNotification", None)
-        except Exception:
-            pass
-
-    def handleSleep_(self, notification):
-        pause_song()
-
-# create instance but don't start automatically here
-sleep_listener = SleepListener.alloc().init()
+def process_sleep_events():
+    """Check the sleep event queue and handle pause if needed."""
+    try:
+        while True:
+            event = sleep_event_queue.get_nowait()
+            if event == "sleep":
+                # Safe pause without directly touching Tkinter from another thread
+                global paused, player
+                if player:
+                    try:
+                        # Completely stop and pause the player
+                        player.pause()
+                        paused = True  # Mark as paused so it doesn't auto-resume on wake
+                        mark_pause_item(current_index_playing)
+                    except Exception as e:
+                        print(f"Error pausing on sleep: {e}")
+    except queue.Empty:
+        pass
+    except Exception as e:
+        print(f"Error processing sleep events: {e}")
+    finally:
+        # Schedule the next check
+        root.after(100, process_sleep_events)
 
 # === Start ===
 load_saved_playlist()
+
+# Start checking for sleep events
+process_sleep_events()
+
 root.mainloop()

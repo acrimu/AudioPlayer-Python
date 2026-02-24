@@ -467,14 +467,17 @@ def check_song_end():
             if not paused:
                 if current_index_playing < len(playlist) - 1:
                     skip(1)
-                elif len(playlist) > 0:
-                    current_index_playing = 0
-                    play_song()
-                    # --- Ensure the first song is selected in the tree ---
-                    first_item = tree.get_children()[0]
-                    #tree.selection_set(first_item)
-                    #tree.focus(first_item)
-                    tree.see(first_item)
+                else:
+                    # Last track finished — stop playback and mark item stopped.
+                    try:
+                        stop_song()
+                    except Exception:
+                        pass
+                    if 0 <= current_index_playing < len(playlist):
+                        try:
+                            mark_stopped_item(current_index_playing)
+                        except Exception:
+                            pass
             return
     root.after(1000, check_song_end)
 

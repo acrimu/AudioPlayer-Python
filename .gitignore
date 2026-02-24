@@ -1,0 +1,17 @@
+last_playlist.json
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.bak
+*.swp
+.DS_Store
+.idea/
+.vscode/
+.env
+venv/
+AudioPlayer.spec

@@ -53,9 +53,6 @@ from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 from mutagen import File as MutagenFile
 
-import objc
-from Foundation import NSObject
-from Cocoa import NSWorkspace
 from tkinter import ttk, filedialog
 import tkinter as tk
 import sys
@@ -77,8 +74,7 @@ def get_user_data_dir():
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
-# === Thread-safe queue for macOS sleep notifications ===
-sleep_event_queue = queue.Queue()
+# (macOS sleep listener support removed)
 
 # === Logic ===
 global current_index_playing, index_to_play
@@ -812,92 +808,11 @@ tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 # keyboard shortcuts for quick reordering
 root.bind_all("<Control-Up>", lambda e: move_selected_up())
 root.bind_all("<Control-Down>", lambda e: move_selected_down())
-
-# === Sleep Listener ===
-class SleepListener(NSObject):
-    def init(self):
-        objc.super(SleepListener, self).init()
-        return self
-
-    def start(self):
-        try:
-            NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
-                self, objc.selector(self.handleSleep_, signature=b'v@:@'),
-                "NSWorkspaceWillSleepNotification", None)
-        except Exception as e:
-            print(f"Error starting sleep listener: {e}")
-
-    def stop(self):
-        try:
-            NSWorkspace.sharedWorkspace().notificationCenter().removeObserver_name_object_(
-                self, "NSWorkspaceWillSleepNotification", None)
-        except Exception as e:
-            print(f"Error stopping sleep listener: {e}")
-
-    def handleSleep_(self, notification):
-        # Put event in thread-safe queue instead of calling Tkinter directly
-        # This avoids GIL issues with PyObjC running on a different thread
-        try:
-            sleep_event_queue.put("sleep", block=False)
-        except Exception as e:
-            print(f"Error queuing sleep event: {e}")
-
-# create instance
-sleep_listener = SleepListener.alloc().init()
-
-# --- Sleep listener checkbox ---
-sleep_listener_enabled = tk.BooleanVar(value=True)  # default checked
-
-def toggle_sleep_listener():
-    if sleep_listener_enabled.get():
-        try:
-            sleep_listener.start()
-        except Exception:
-            pass
-    else:
-        try:
-            sleep_listener.stop()
-        except Exception:
-            pass
-
-ttk.Checkbutton(btn2_frame, text="Pause on sleep", variable=sleep_listener_enabled,
-                command=toggle_sleep_listener()).grid(row=1, column=4, padx=6)
-
-# start listener if default enabled
-if sleep_listener_enabled.get():
-    try:
-        sleep_listener.start()
-    except Exception:
-        pass
-
-def process_sleep_events():
-    """Check the sleep event queue and handle pause if needed."""
-    try:
-        while True:
-            event = sleep_event_queue.get_nowait()
-            if event == "sleep":
-                # Safe pause without directly touching Tkinter from another thread
-                global paused, player
-                if player:
-                    try:
-                        # Completely stop and pause the player
-                        player.pause()
-                        paused = True  # Mark as paused so it doesn't auto-resume on wake
-                        mark_pause_item(current_index_playing)
-                    except Exception as e:
-                        print(f"Error pausing on sleep: {e}")
-    except queue.Empty:
-        pass
-    except Exception as e:
-        print(f"Error processing sleep events: {e}")
-    finally:
-        # Schedule the next check
-        root.after(100, process_sleep_events)
+# macOS sleep listener support removed
 
 # === Start ===
 load_saved_playlist()
 
-# Start checking for sleep events
-process_sleep_events()
+# (sleep event processing removed)
 
 root.mainloop()

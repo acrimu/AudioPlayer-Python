@@ -639,21 +639,26 @@ def move_selected_up():
     sel = tree.selection()
     if not sel:
         return
-    idx = tree.index(sel[0])
-    if idx <= 0:
+    children = list(tree.get_children())
+    try:
+        idx = children.index(sel[0])
+    except ValueError:
         return
-    move_song(idx, idx - 1)
-
+    if idx > 0:
+        move_song(idx, idx - 1)
 
 def move_selected_down():
     print("move_selected_down called")
     sel = tree.selection()
     if not sel:
         return
-    idx = tree.index(sel[0])
-    if idx >= len(playlist) - 1:
+    children = list(tree.get_children())
+    try:
+        idx = children.index(sel[0])
+    except ValueError:
         return
-    move_song(idx, idx + 1)
+    if idx < len(playlist) - 1:
+        move_song(idx, idx + 1)
 
 # === Context Menu ===
 def show_context_menu(event):
@@ -806,8 +811,8 @@ tree.bind("<Button-3>", show_context_menu)  # Right-click on Windows/Linux
 tree.bind("<Control-Button-1>", show_context_menu)  # Ctrl+Click on Mac
 
 # keyboard shortcuts for quick reordering
-root.bind_all("<Control-Up>", lambda e: move_selected_up())
-root.bind_all("<Control-Down>", lambda e: move_selected_down())
+root.bind_all("<Control-u>", lambda e: move_selected_up())
+root.bind_all("<Control-d>", lambda e: move_selected_down())
 # macOS sleep listener support removed
 
 # === Start ===

@@ -47,6 +47,8 @@ import os
 import json
 import time
 import queue
+import platform
+import pathlib
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 from mutagen import File as MutagenFile
@@ -61,6 +63,19 @@ import subprocess
 
 # Supported audio extensions (used by dialogs and folder scanning)
 SUPPORTED_EXTS = (".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma")
+
+def get_user_data_dir():
+    """Get the appropriate user data directory for storing application data."""
+    if platform.system() == "Darwin":  # macOS
+        data_dir = pathlib.Path.home() / "Library" / "Application Support" / "AudioPlayer"
+    elif platform.system() == "Windows":
+        data_dir = pathlib.Path.home() / "AppData" / "Local" / "AudioPlayer"
+    else:  # Linux and others
+        data_dir = pathlib.Path.home() / ".audioplayer"
+    
+    # Ensure the directory exists
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 # === Thread-safe queue for macOS sleep notifications ===
 sleep_event_queue = queue.Queue()
@@ -654,7 +669,7 @@ def show_context_menu(event):
 
 
 
-PLAYLIST_FILE = "last_playlist.json"
+PLAYLIST_FILE = str(get_user_data_dir() / "last_playlist.json")
 playlist, current_index, paused, player, current_song_length = [], 0, False, None, 0
 last_opened_folder = os.path.expanduser("~")  # Default to home folder
 

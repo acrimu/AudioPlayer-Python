@@ -768,7 +768,7 @@ btn2_frame = ttk.Frame(root)
 btn2_frame.pack(pady=12)
 
 # make all six control buttons the same visual width
-BTN2_WIDTH = 12
+BTN2_WIDTH = 14
 
 # === Load Folder Button ===
 ttk.Button(btn2_frame, text="Add folder", command=lambda: add_folder(), width=BTN2_WIDTH

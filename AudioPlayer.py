@@ -96,7 +96,7 @@ class App(TkinterDnD.Tk):
         self.tree_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 5))
 
         columns = ("No.", "Title", "Artist", "Duration")
-        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings", selectmode="browse")
+        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings", selectmode="extended")
         for col in columns:
             self.tree.heading(col, text=col)
         self.tree.column("No.", width=40)
@@ -659,27 +659,36 @@ class App(TkinterDnD.Tk):
         sel = self.tree.selection()
         if not sel:
             return
-        idx = self.tree.index(sel[0])
-        if idx < 0 or idx >= len(self.playlist):
-            return
-
-        was_playing_deleted = (self.player is not None and self.current_index_playing == idx)
-
-        if was_playing_deleted:
+        
+        # Create a mapping of indices to tree items
+        index_to_item = {self.tree.index(item): item for item in sel}
+        
+        # Get indices for all selected items, sorted in descending order
+        indices = sorted(index_to_item.keys(), reverse=True)
+        
+        # Check if any of the deleted songs is currently playing
+        was_playing_deleted = False
+        if self.player is not None and self.current_index_playing in indices:
+            was_playing_deleted = True
             self.stop_song()
             self.player = None
-
-        del self.playlist[idx]
-        self.tree.delete(sel[0])
+        
+        # Delete from highest index to lowest (to avoid index shifting issues)
+        for idx in indices:
+            if 0 <= idx < len(self.playlist):
+                del self.playlist[idx]
+                self.tree.delete(index_to_item[idx])  # Delete the corresponding item
+        
         self.renumber_tree()
-
-        # adjust playing index if it was after deleted index
-        if self.player is not None and self.current_index_playing > idx:
-            self.current_index_playing -= 1
-
+        
+        # Adjust playing index for any deleted items that were before current_index_playing
+        if self.player is not None:
+            num_deleted_before = sum(1 for idx in indices if idx < self.current_index_playing)
+            self.current_index_playing -= num_deleted_before
+        
         if self.playlist:
-            # select next item: same index if it exists, otherwise the new last item
-            new_index = idx if idx < len(self.playlist) else len(self.playlist) - 1
+            # Select next item: same index as lowest deleted if it exists, otherwise the new last item
+            new_index = indices[-1] if indices[-1] < len(self.playlist) else len(self.playlist) - 1
             self.current_index = new_index
             if was_playing_deleted:
                 self.current_index_playing = self.current_index

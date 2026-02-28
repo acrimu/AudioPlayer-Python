@@ -589,7 +589,7 @@ class App(TkinterDnD.Tk):
             self.mark_stopped_item(self.current_index_playing)
 
     def skip(self, step):
-        self.current_index_playing = (self.current_index_playing + step) % len(self.playlist)
+        self.index_to_play = (self.index_to_play + step) % len(self.playlist)
         self.play_song()
 
     def update_progress(self):
@@ -777,7 +777,7 @@ class App(TkinterDnD.Tk):
             self.tree.see(item_id)
 
         # update visual markers
-        if player is not None:
+        if self.player is not None:
             # there's an active player; mark playing item
             if 0 <= self.current_index_playing < len(self.playlist):
                 self.mark_playing_item(self.current_index_playing)
